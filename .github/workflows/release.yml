@@ -1,0 +1,42 @@
+name: 发布
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      snapshot:
+        description: '仅测试构建（不发布）'
+        type: boolean
+        default: false
+      draft:
+        description: '创建草稿发布'
+        type: boolean
+        default: false
+      prerelease:
+        description: '标记为预发布'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 构建和发布
+        uses: ./.github/actions/build-release
+        with:
+          mode: ${{ inputs.snapshot && 'snapshot' || 'release' }}
+          go-version: '1.20'
+          retention-days: '90'
+          release-args: ${{ inputs.draft && '--draft' || '' }} ${{ inputs.prerelease && '--prerelease' || '' }}

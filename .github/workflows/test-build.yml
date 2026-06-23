@@ -1,0 +1,202 @@
+﻿name: 测试构建
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - dev-*
+      - develop
+      - feature/*
+    paths-ignore:
+      - '*.md'
+      - '*.txt'
+      - 'README*'
+      - 'LICENSE*'
+      - 'image/**'
+      - 'TestDocker/**'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+  pull_request:
+    branches:
+      - main
+      - master
+      - dev
+    paths-ignore:
+      - '*.md'
+      - '*.txt'
+      - 'README*'
+      - 'LICENSE*'
+      - 'image/**'
+      - 'TestDocker/**'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: 代码检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: 运行 golangci-lint
+        run: |
+          # 安装 golangci-lint v2
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.1
+
+          # 运行检查并灵活处理结果
+          set +e
+          golangci-lint run --timeout=5m > lint_output.txt 2>&1
+          LINT_EXIT_CODE=$?
+          cat lint_output.txt
+          set -e
+
+          # 只关注真正的 bug，忽略代码质量建议
+          # 过滤规则：
+          # - gocognit/gocyclo: 复杂度警告（阈值已在配置中设置）
+          # - QF/S/ST: staticcheck 的代码质量改进建议（非bug）
+          if [ $LINT_EXIT_CODE -ne 0 ]; then
+            CRITICAL_ISSUES=$(grep -E "\.go:[0-9]+:[0-9]+:" lint_output.txt | grep -v "gocognit" | grep -v "gocyclo" | grep -v "QF[0-9]" | grep -v " S[0-9]" | grep -v "ST[0-9]" || true)
+            if [ -n "$CRITICAL_ISSUES" ]; then
+              echo "❌ Linting failed with critical issues:"
+              echo "$CRITICAL_ISSUES" | head -20
+              exit 1
+            else
+              echo "⚠️  Only quality suggestions - PASSING"
+              exit 0
+            fi
+          fi
+          echo "✅ No lint issues found"
+
+      - name: 检查代码复杂度（质量门禁）
+        run: |
+          echo "### 🚦 复杂度质量门禁" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 检查认知复杂度>80的函数
+          COMPLEX_FUNCS=$(golangci-lint run --disable-all --enable=gocognit --out-format=line-number 2>&1 | grep "cognitive complexity" | grep -v "typechecking" || true)
+
+          if [ -n "$COMPLEX_FUNCS" ]; then
+            HIGH_COMPLEX=$(echo "$COMPLEX_FUNCS" | awk '{print $NF}' | sed 's/[()]//g' | awk -F'>' '{if ($1 > 80) print}' | wc -l)
+
+            if [ "$HIGH_COMPLEX" -gt 0 ]; then
+              echo "❌ **发现 $HIGH_COMPLEX 个复杂度>80的函数**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "$COMPLEX_FUNCS" | awk '{print $NF}' | sed 's/[()]//g' | awk -F'>' '{if ($1 > 80) print "复杂度:", $1, "- 必须重构"}' >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ 请重构复杂度>80的函数后再提交" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          fi
+
+          echo "✅ 代码复杂度检查通过（所有函数≤80）" >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: 单元测试和构建
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: lint
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.20'
+          cache: true
+
+      - name: 下载依赖
+        run: |
+          go mod download
+          go mod verify
+
+      - name: 运行测试
+        run: |
+          # 排除第三方grdp库测试（存在环境依赖问题）
+          go test -vet=off -race -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v '/mylib/grdp/')
+
+      - name: 上传覆盖率
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 7
+
+      - name: 显示覆盖率
+        run: |
+          echo "### 测试覆盖率报告" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          go tool cover -func=coverage.out >> $GITHUB_STEP_SUMMARY
+
+      - name: 检查覆盖率（质量门禁）
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚦 覆盖率质量门禁" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 提取总体覆盖率
+          TOTAL_COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+
+          echo "总体覆盖率: ${TOTAL_COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 检查核心模块覆盖率（core, common/parsers必须>50%）
+          CORE_COVERAGE=$(go tool cover -func=coverage.out | grep "^test/core/" | grep -v "_test.go" | awk '{sum+=$3; count++} END {if(count>0) print sum/count; else print 0}')
+          PARSERS_COVERAGE=$(go tool cover -func=coverage.out | grep "^test/common/parsers/" | grep -v "_test.go" | awk '{sum+=$3; count++} END {if(count>0) print sum/count; else print 0}')
+
+          # 警告阈值：总体<40%, 核心模块<50%
+          if (( $(echo "$TOTAL_COVERAGE < 40" | bc -l) )); then
+            echo "⚠️ **警告**: 总体覆盖率 ${TOTAL_COVERAGE}% < 40%，建议补充测试" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # 检查是否有新增的未测试文件（0%覆盖率）
+          ZERO_COVERAGE_FILES=$(go tool cover -func=coverage.out | awk '$3 == "0.0%" && $1 !~ /_test\.go/' | wc -l)
+          if [ "$ZERO_COVERAGE_FILES" -gt 0 ]; then
+            echo "⚠️ **警告**: 发现 $ZERO_COVERAGE_FILES 个文件覆盖率为0%" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "请为新代码补充单元测试" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ 覆盖率检查通过" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  build:
+    name: 构建验证
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.20'
+          cache: true
+
+      - name: 构建验证
+        run: |
+          # 只验证能否编译通过，不需要多平台构建
+          echo "🔨 验证 Linux/amd64 构建..."
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /dev/null .
+          echo "✅ 构建成功"

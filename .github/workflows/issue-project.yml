@@ -1,0 +1,81 @@
+name: Project 自动化
+
+on:
+  issues:
+    types: [opened, closed, reopened]
+
+env:
+  PROJECT_URL: https://github.com/users/shadow1ng/projects/1
+
+jobs:
+  # Issue/PR 创建时添加到 Project，状态设为"要搞"
+  add-to-project:
+    if: github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add to project
+        uses: actions/add-to-project@v1.0.2
+        id: add
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set status to 要搞
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh project item-edit \
+            --project-id PVT_kwHOAl0Kfs4BCgG2 \
+            --id ${{ steps.add.outputs.itemId }} \
+            --field-id PVTSSF_lAHOAl0Kfs4BCgG2zg0sX8A \
+            --single-select-option-id f75ad846
+
+  # Issue/PR 关闭时状态设为"搞定"
+  close-item:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get item ID
+        id: get-item
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ITEM_ID=$(gh project item-list 1 --owner shadow1ng --format json | \
+            jq -r '.items[] | select(.content.number == ${{ github.event.issue.number || github.event.pull_request.number }}) | .id')
+          echo "item_id=$ITEM_ID" >> $GITHUB_OUTPUT
+
+      - name: Set status to 搞定
+        if: steps.get-item.outputs.item_id != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh project item-edit \
+            --project-id PVT_kwHOAl0Kfs4BCgG2 \
+            --id ${{ steps.get-item.outputs.item_id }} \
+            --field-id PVTSSF_lAHOAl0Kfs4BCgG2zg0sX8A \
+            --single-select-option-id 98236657
+
+  # Issue/PR 重新打开时状态设为"在搞"
+  reopen-item:
+    if: github.event.action == 'reopened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get item ID
+        id: get-item
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ITEM_ID=$(gh project item-list 1 --owner shadow1ng --format json | \
+            jq -r '.items[] | select(.content.number == ${{ github.event.issue.number || github.event.pull_request.number }}) | .id')
+          echo "item_id=$ITEM_ID" >> $GITHUB_OUTPUT
+
+      - name: Set status to 在搞
+        if: steps.get-item.outputs.item_id != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh project item-edit \
+            --project-id PVT_kwHOAl0Kfs4BCgG2 \
+            --id ${{ steps.get-item.outputs.item_id }} \
+            --field-id PVTSSF_lAHOAl0Kfs4BCgG2zg0sX8A \
+            --single-select-option-id 47fc9ee4

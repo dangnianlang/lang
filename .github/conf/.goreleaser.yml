@@ -1,0 +1,248 @@
+﻿project_name: "fscan"
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+    - chmod +x .github/scripts/build-lite.sh
+    - bash .github/scripts/build-lite.sh {{ .Version }}
+
+builds:
+  # 标准版 - 全部插件（全架构）
+  - id: fscan
+    binary: fscan
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos: [windows, linux, darwin, freebsd, solaris]
+    goarch: [amd64, arm64, "386", arm, mips, mips64, mipsle]
+    goarm: ["5", "6", "7"]
+    gomips: [softfloat]
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: mips
+      - goos: darwin
+        goarch: mips64
+      - goos: darwin
+        goarch: mipsle
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: mips
+      - goos: windows
+        goarch: mips64
+      - goos: windows
+        goarch: mipsle
+      - goos: freebsd
+        goarch: mips
+      - goos: freebsd
+        goarch: mips64
+      - goos: freebsd
+        goarch: mipsle
+      - goos: solaris
+        goarch: "386"
+      - goos: solaris
+        goarch: arm
+      - goos: solaris
+        goarch: arm64
+      - goos: solaris
+        goarch: mips
+      - goos: solaris
+        goarch: mips64
+      - goos: solaris
+        goarch: mipsle
+    flags: [-trimpath]
+    ldflags: -s -w -X test/scan/common.version={{ .Version }} -X test/scan/common.commit={{ .ShortCommit }} -X test/scan/common.date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  # 无本地插件版 - 排除本地模块（全架构）
+  - id: fscan-nolocal
+    binary: fscan
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos: [windows, linux, darwin, freebsd, solaris]
+    goarch: [amd64, arm64, "386", arm, mips, mips64, mipsle]
+    goarm: ["5", "6", "7"]
+    gomips: [softfloat]
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: mips
+      - goos: darwin
+        goarch: mips64
+      - goos: darwin
+        goarch: mipsle
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: mips
+      - goos: windows
+        goarch: mips64
+      - goos: windows
+        goarch: mipsle
+      - goos: freebsd
+        goarch: mips
+      - goos: freebsd
+        goarch: mips64
+      - goos: freebsd
+        goarch: mipsle
+      - goos: solaris
+        goarch: "386"
+      - goos: solaris
+        goarch: arm
+      - goos: solaris
+        goarch: arm64
+      - goos: solaris
+        goarch: mips
+      - goos: solaris
+        goarch: mips64
+      - goos: solaris
+        goarch: mipsle
+    flags: [-trimpath]
+    tags: [no_local]
+    ldflags: -s -w -X test/scan/common.version={{ .Version }} -X test/scan/common.commit={{ .ShortCommit }} -X test/scan/common.date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  # WebUI版 - 主流平台即可
+  - id: fscan-web
+    binary: fscan
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos: [windows, linux, darwin]
+    goarch: [amd64, arm64, "386"]
+    goarm: ["7"]
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: windows
+        goarch: arm64
+    flags: [-trimpath]
+    tags: [web]
+    ldflags: -s -w -X test/scan/common.version={{ .Version }} -X test/scan/common.commit={{ .ShortCommit }} -X test/scan/common.date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+upx:
+  - ids: [fscan, fscan-nolocal, fscan-web]
+    enabled: true
+    goos: [windows, linux, freebsd]
+    goarch: [amd64, "386", arm, arm64, mips, mipsle]
+    compress: best
+    brute: false
+    lzma: false
+
+archives:
+  # 标准版归档
+  - id: fscan
+    builds: [fscan]
+    format: binary
+    allow_different_binary_count: true
+    name_template: >-
+      fscan_{{ .Version }}_
+      {{- if eq .Os "darwin" }}mac
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x64
+      {{- else if eq .Arch "386" }}x32
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+  # 无本地插件版归档
+  - id: fscan-nolocal
+    builds: [fscan-nolocal]
+    format: binary
+    allow_different_binary_count: true
+    name_template: >-
+      fscan-nolocal_{{ .Version }}_
+      {{- if eq .Os "darwin" }}mac
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x64
+      {{- else if eq .Arch "386" }}x32
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+  # WebUI版归档
+  - id: fscan-web
+    builds: [fscan-web]
+    format: binary
+    allow_different_binary_count: true
+    name_template: >-
+      fscan-web_{{ .Version }}_
+      {{- if eq .Os "darwin" }}mac
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x64
+      {{- else if eq .Arch "386" }}x32
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^(docs|test|ci|chore):"
+      - "Merge (pull request|branch)"
+  groups:
+    - title: "🚀 新功能"
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: "🐛 问题修复"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: "🔧 其他改进"
+      order: 999
+
+release:
+  github:
+    owner: "{{ .Env.GITHUB_OWNER }}"
+    name: "{{ .Env.GITHUB_REPO }}"
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## {{ .ProjectName }} {{ .Tag }}
+
+    感谢使用 {{ .ProjectName }}！
+
+    ### 版本说明
+
+    | 版本 | 说明 |
+    |------|------|
+    | **fscan** | 标准版，包含全部插件（推荐） |
+    | **fscan-nolocal** | 精简版，不含本地模块（体积更小） |
+    | **fscan-web** | WebUI版，带Web管理界面（主流平台） |
+
+    ### 平台支持
+
+    | 平台 | 架构 |
+    |------|------|
+    | Linux | x64, x32, arm64, armv5, armv6, armv7, mips, mips64, mipsle |
+    | Windows | x64, x32 |
+    | macOS | x64, arm64 |
+    | FreeBSD | x64, x32, arm64, armv5, armv6, armv7 |
+    | Solaris | x64 |
+  footer: |
+    **完整更新日志**: https://github.com/{{ .Env.GITHUB_OWNER }}/{{ .Env.GITHUB_REPO }}/compare/{{ .PreviousTag }}...{{ .Tag }}
+  extra_files:
+    - glob: ./dist-lite/*
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-dev-{{ .ShortCommit }}"
+
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"

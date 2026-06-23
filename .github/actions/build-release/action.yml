@@ -1,0 +1,103 @@
+name: '构建和发布'
+description: 'fscan 可复用构建动作'
+
+inputs:
+  mode:
+    description: '构建模式: release 或 snapshot'
+    required: true
+    default: 'snapshot'
+  go-version:
+    description: 'Go 版本'
+    required: false
+    default: '1.20'
+  retention-days:
+    description: '产物保留天数'
+    required: false
+    default: '7'
+  release-args:
+    description: '额外的 goreleaser 参数'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 设置 Go 环境
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache: true
+
+    - name: 安装 C 编译工具
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y gcc make mingw-w64 gcc-multilib g++-multilib
+
+    - name: 下载依赖
+      shell: bash
+      run: |
+        go mod download
+        go mod verify
+
+    - name: 安装 UPX
+      uses: crazy-max/ghaction-upx@v3
+      with:
+        install-only: true
+
+    - name: 使用 GoReleaser 构建
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser
+        version: latest
+        args: release ${{ inputs.mode == 'snapshot' && '--snapshot' || '' }} --clean -f .github/conf/.goreleaser.yml ${{ inputs.release-args }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_OWNER: ${{ github.repository_owner }}
+        GITHUB_REPO: ${{ github.event.repository.name }}
+        PROJECT_NAME: ${{ github.event.repository.name }}
+
+    - name: 上传产物
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: build-${{ inputs.mode }}-${{ github.run_id }}
+        path: |
+          dist/
+          dist-lite/
+        retention-days: ${{ inputs.retention-days }}
+
+    - name: 生成报告
+      shell: bash
+      if: always()
+      run: |
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        # 构建报告
+
+        | 项目 | 值 |
+        |------|-----|
+        | 模式 | \`${{ inputs.mode }}\` |
+        | 版本 | \`${GITHUB_REF_NAME}\` |
+        | 提交 | \`${GITHUB_SHA:0:7}\` |
+        | Go | \`$(go version | awk '{print $3}')\` |
+
+        ## 构建产物
+
+        ### fscan (Go 版本)
+        $(if [ -d "dist" ]; then
+          echo "- 文件数: $(find dist -type f 2>/dev/null | wc -l)"
+          echo "- 大小: $(du -sh dist 2>/dev/null | cut -f1)"
+        else
+          echo "- 无产物"
+        fi)
+
+        ### fscan-lite (C 版本)
+        $(if [ -d "dist-lite" ]; then
+          echo "- 文件数: $(find dist-lite -type f 2>/dev/null | wc -l)"
+          echo "- 大小: $(du -sh dist-lite 2>/dev/null | cut -f1)"
+        else
+          echo "- 无产物"
+        fi)
+
+        [查看产物](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        EOF
