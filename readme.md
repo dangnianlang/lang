@@ -207,30 +207,28 @@ fscan_upx.exe -local winwmi       # WMI持久化
 ### 卡巴
 
 正常运行，无告警
+<img width="1218" height="589" alt="image-20260623230237393" src="https://github.com/user-attachments/assets/94184a4a-f474-4e80-b9a3-7025f4b486cc" />
+<img width="1412" height="736" alt="image-20260623230437415" src="https://github.com/user-attachments/assets/80a8a92a-1770-4628-8778-a84677a0f133" />
 
-![image-20260623230237393](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260623230237393.png)
 
-![image-20260623230437415](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260623230437415.png)
 
 
 
 ### 360
 
 正常运行，无告警
+<img width="1149" height="574" alt="image-20260623230600904" src="https://github.com/user-attachments/assets/66f22aef-1d8c-49d2-8775-4e9f8b6a1427" />
+<img width="1431" height="887" alt="image-20260623230700001" src="https://github.com/user-attachments/assets/bcc8782a-e2e9-463a-bbfd-12f234a8543d" />
 
-![image-20260623230600904](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260623230600904.png)
-
-![image-20260623230700001](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260623230700001.png)
 
 
 
 ### 火绒
 
 懂的都懂，源码、exe都给它扫毫无动静
+<img width="904" height="682" alt="image-20260623231056197" src="https://github.com/user-attachments/assets/a7821e1d-3ba4-4bf2-bb80-98869be18890" />
+<img width="1105" height="669" alt="image-20260623231237592" src="https://github.com/user-attachments/assets/1c5b73f1-8207-4b12-85c9-b3de0c5ba9b2" />
 
-![image-20260623231056197](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260623231056197.png)
-
-![image-20260623231237592](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20260623231237592.png)
 
 ## 注意事项
 
