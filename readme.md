@@ -204,6 +204,11 @@ fscan_upx.exe -local winwmi       # WMI持久化
 
 
 
+### 微步云沙箱
+
+<img width="803" height="377" alt="image" src="https://github.com/user-attachments/assets/e7b6171b-d53c-4329-bc6d-feb5e11f0480" />
+
+
 ### 卡巴
 
 正常运行，无告警
